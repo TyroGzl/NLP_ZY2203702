@@ -18,7 +18,7 @@ class GMM:
         else:
             self.miu = []
             for i in range(self.n):
-                sample_count = int(len(self.data) / 2)
+                sample_count = int(len(self.data) * self.theta[i])
                 sample = random.sample(self.data, sample_count)
                 self.miu.append(sum(sample) / sample_count)
 
@@ -33,6 +33,6 @@ if __name__ == '__main__':
     data = []
     for i in range(data_read.size):
         data.append(data_read.values[i].tolist()[0])
-    g = GMM(data, 2)
+    g = GMM(data, 3)
     print(data[1])
     print(1)
