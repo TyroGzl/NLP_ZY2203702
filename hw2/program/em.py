@@ -42,7 +42,6 @@ class GMM:
             gamma = np.zeros((self.data_len, self.n))
             for i in range(self.data_len):
                 for n in range(self.n):
-                    c = self.gaussian(self.data[i], self.miu[n], self.sigma[n])
                     gamma[i][n] = self.theta[n] * self.gaussian(self.data[i], self.miu[n], self.sigma[n])
                 gamma[i] = gamma[i] / sum(gamma[i])
             # m步
@@ -51,7 +50,7 @@ class GMM:
             theta_new = [0, 0]
             for n in range(self.n):
                 miu_new[n] = np.dot(self.data, gamma[:, n]) / np.sum(gamma[:, n])
-                sigma_new[n] = math.sqrt(np.dot((np.array(self.data) - self.miu[n]) ** 2, gamma[:, n]) / np.sum(
+                sigma_new[n] = math.sqrt(np.dot((np.array(self.data) - miu_new[n]) ** 2, gamma[:, n]) / np.sum(
                     gamma[:, n]))
                 theta_new[n] = np.mean(gamma[:, n])
             if np.max(np.array(miu_new) - np.array(self.miu)) < eps and np.max(
@@ -72,7 +71,20 @@ if __name__ == '__main__':
     data = []
     for i in range(data_read.size):
         data.append(data_read.values[i].tolist()[0])
-    g = GMM(data, 2, theta=[0.75, 0.25], miu=[176, 164], sigma=[5, 3])
+    g = GMM(data, 2, theta=[0.5, 0.5], miu=[170, 170], sigma=[1, 1])
     g.gmm_em(1000)
-    print("男生比例为{}，男生身高均值为{}，男生身高方差为{}".format(g.theta[0], g.miu[0], g.sigma[0]))
-    print("女生比例为{}，女生身高均值为{}，女生身高方差为{}".format(g.theta[1], g.miu[1], g.sigma[1]))
+    print(
+        "男生比例为{:.4f}，相对偏差为{:.2%}，男生身高均值为{:.4f}，相对偏差为{:.2%}，男生身高方差为{:.4f}，相对偏差为{:.2%}".format(
+            g.theta[0], (g.theta[0] - 0.75) / 0.75, g.miu[0], (g.miu[0] - 176) / 176, g.sigma[0], (g.sigma[0] - 5) / 5))
+    print(
+        "女生比例为{:.4f}，相对偏差为{:.2%}，女生身高均值为{:.4f}，相对偏差为{:.2%}，女生身高方差为{:.4f}，相对偏差为{:.2%}".format(
+            g.theta[1], (g.theta[1] - 0.25) / 0.25, g.miu[1], (g.miu[1] - 164) / 164, g.sigma[1], (g.sigma[1] - 3) / 3))
+
+    g = GMM(data, 2, theta=[0.5, 0.5], miu=[170, 160], sigma=[1, 1])
+    g.gmm_em(1000)
+    print(
+        "男生比例为{:.4f}，相对偏差为{:.2%}，男生身高均值为{:.4f}，相对偏差为{:.2%}，男生身高方差为{:.4f}，相对偏差为{:.2%}".format(
+            g.theta[0], (g.theta[0] - 0.75) / 0.75, g.miu[0], (g.miu[0] - 176) / 176, g.sigma[0], (g.sigma[0] - 5) / 5))
+    print(
+        "女生比例为{:.4f}，相对偏差为{:.2%}，女生身高均值为{:.4f}，相对偏差为{:.2%}，女生身高方差为{:.4f}，相对偏差为{:.2%}".format(
+            g.theta[1], (g.theta[1] - 0.25) / 0.25, g.miu[1], (g.miu[1] - 164) / 164, g.sigma[1], (g.sigma[1] - 3) / 3))
