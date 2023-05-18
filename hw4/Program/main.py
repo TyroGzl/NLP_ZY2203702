@@ -28,9 +28,9 @@ class lstm_model(nn.Module):
 
     def forward(self, sequence, hs=None):
         out, hs = self.lstm(sequence, hs)  # lstm的输出格式（batch_size, sequence_length, hidden_size）
-        # out = out.reshape(-1, self.hidden_size)  # 这里需要将out转换为linear的输入格式，即（batch_size * sequence_length, hidden_size）
-        # output = self.linear(out)
-        output = self.linear(out[:, -1])  # linear的输出格式，(batch_size * sequence_length, vocab_size)
+        out = out.reshape(-1, self.hidden_size)  # 这里需要将out转换为linear的输入格式，即（batch_size * sequence_length, hidden_size）
+        output = self.linear(out)
+        # output = self.linear(out[:, -1])  # linear的输出格式，(batch_size * sequence_length, vocab_size)
         return output, hs
 
     def onehot_encode(self, data):
@@ -64,31 +64,14 @@ def get_batches(data, batch_size, seq_len):
 
     inputs = data[:need_chars].A.astype("int")  # 从原始数据data中截取所需的字符数量need_words
     targets = targets[:need_chars]
-    train_data = np.zeros((inputs.shape[0] - seq_len, seq_len, num_features))
-    train_label = np.zeros((inputs.shape[0] - seq_len, num_features))
 
-    for i in range(0, inputs.shape[0] - seq_len, 1):
-        # inputs就是字符数 * 词向量大小（表示一个字符）
-        # 思路就是abcd中ab-c, bc-d,一共4-3+1个
-        train_data[i] = inputs[i:i + seq_len]  # 每seq_len=100的字符
-        train_label[i] = inputs[i + seq_len - 1]  # 训练标签就为他后面那个字符
-    print(train_data.shape)
-    print(train_label.shape)
-    for i in range(0, inputs.shape[0] - seq_len, batch_size):
-        x = train_data[i:i + batch_size]  # 每batch_size=128个一起进行训练更新参数
-        y = train_label[i:i + batch_size]  # 对应的128个标签
-        print(x.shape)
-        print(y.shape)
-        print("-----------")
-        yield x, y
+    targets = targets.reshape(batch_size, -1, num_features)
+    inputs = inputs.reshape(batch_size, -1, num_features)
 
-    # targets = targets.reshape(batch_size, -1, num_features)
-    # inputs = inputs.reshape(batch_size, -1, num_features)
-    #
-    # for i in range(0, inputs.shape[1], seq_len):
-    #     x = inputs[:, i: i + seq_len]
-    #     y = targets[:, i: i + seq_len]
-    #     yield x, y  # 节省内存
+    for i in range(0, inputs.shape[1], seq_len):
+        x = inputs[:, i: i + seq_len]
+        y = targets[:, i: i + seq_len]
+        yield x, y  # 节省内存
 
 
 def train(model, data, batch_size, seq_len, epochs, lr=0.01, valid=None):
