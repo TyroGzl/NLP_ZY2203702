@@ -9,6 +9,7 @@ import os
 import jieba
 import jieba.analyse
 
+
 class lstm_model(nn.Module):
     def __init__(self, vocab, hidden_size, num_layers, dropout=0.5):
         super(lstm_model, self).__init__()
@@ -127,13 +128,13 @@ def train(model, data, batch_size, seq_len, epochs, lr=0.01):
     plt.legend()
     plt.show()
 
-    model_name = "lstm_model.net"
+    model_name = dir_name + "/lstm_model.net"
 
     with open(model_name, 'wb') as f:  # 训练完了保存模型
         torch.save(model.state_dict(), f)
 
 
-def predict(model, char, top_k=None, hidden_size=None):
+def predict(model, char, top_k=1, hidden_size=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model.to(device)
     model.eval()  # 固定参数
@@ -149,11 +150,8 @@ def predict(model, char, top_k=None, hidden_size=None):
 
         probs = F.softmax(out, dim=1).squeeze()  # 计算预测值,即所有字符的概率
 
-        if top_k is None:  # 选择概率最大的top_k个
-            indices = np.arange(vocab_size)
-        else:
-            probs, indices = probs.topk(top_k)
-            indices = indices.cpu().numpy()
+        probs, indices = probs.topk(top_k)
+        indices = indices.cpu().numpy()
         probs = probs.cpu().numpy()
 
         char_index = np.random.choice(indices, p=probs / probs.sum())  # 随机选择一个字符索引作为预测值
@@ -162,7 +160,7 @@ def predict(model, char, top_k=None, hidden_size=None):
     return char, hidden_size
 
 
-def sample(model, length, top_k=None, sentence="三十三剑客图"):
+def sample(model, length, top_k=1, sentence="三十三剑客图"):
     hidden_size = None
     new_sentence = [char for char in sentence]
     for i in range(length):
@@ -192,9 +190,9 @@ def main():
     num_layers = 2
     batch_size = 128
     seq_len = 100
-    epochs = 5000
+    epochs = 1000
     lr = 0.01
-
+    dir_name = os.path.basename(__file__).split(".")[0]
     with open("data/三十三剑客图.txt", "r", encoding='gbk') as f:
         text = f.read()
         text = text.replace(
@@ -205,10 +203,10 @@ def main():
     trainset = np.array(list(text))
 
     model = lstm_model(vocab, hidden_size, num_layers)  # 模型实例化
-    train(model, trainset, batch_size, seq_len, epochs, lr=lr)  # 训练模型
-    model.load_state_dict(torch.load("lstm_model.net"))  # 调用保存的模型
+    # train(model, trainset, batch_size, seq_len, epochs, lr=lr)  # 训练模型
+    model.load_state_dict(torch.load(dir_name + "/lstm_model.net"))  # 调用保存的模型
     new_text = sample(model, 500, top_k=5,
-                      sentence="间")  # 预测模型，生成100个字符,预测时选择概率最大的前5个
+                      sentence="唐朝开元年间")  # 预测模型，生成100个字符,预测时选择概率最大的前5个
     print(new_text)  # 输出预测文本
 
 
