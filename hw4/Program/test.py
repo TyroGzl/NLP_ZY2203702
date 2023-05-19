@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import OneHotEncoder
 import torch.nn.functional as F
+import os
 
 
 class lstm_model(nn.Module):
@@ -29,7 +30,7 @@ class lstm_model(nn.Module):
     def forward(self, sequence, hs=None):
         out, hs = self.lstm(sequence, hs)  # lstm的输出格式（batch_size, sequence_length, hidden_size）
         out = out.reshape(-1, self.hidden_size)  # 这里需要将out转换为linear的输入格式，即（batch_size * sequence_length, hidden_size）
-        output = self.linear(out)  # linear的输出格式，(batch_size * sequence_length, vocab_size)
+        output = self.linear(out)
         return output, hs
 
     def onehot_encode(self, data):
@@ -73,28 +74,30 @@ def get_batches(data, batch_size, seq_len):
         yield x, y  # 节省内存
 
 
-def train(model, data, batch_size, seq_len, epochs, lr=0.01, valid=None):
+def train(model, data, batch_size, seq_len, epochs, lr=0.01):
+    dir_name = os.path.basename(__file__).split(".")[0]
+    if not os.path.exists(dir_name):
+        os.mkdir(dir_name)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print("The device used is: ".format(device))
-
+    print("The device used is: {}".format(device))
+    print("Load model or not: \n1: Yes\n2: No\n")
+    flag = eval(input())
+    if flag == 1:
+        print("Input model name: ")
+        model_name = input()
+        model.load_state_dict(torch.load(model_name))
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss()
 
-    if valid is not None:
-        data = model.onehot_encode(data.reshape(-1, 1))
-        valid = model.onehot_encode(valid.reshape(-1, 1))
-    else:
-        data = model.onehot_encode(data.reshape(-1, 1))
+    data = model.onehot_encode(data.reshape(-1, 1))
 
     train_loss = []
-    # val_loss = []
 
     for epoch in range(epochs):
         model.train()
-        hs = None  # hs等于hidden_size隐藏层节点
+        hs = None
         train_ls = 0.0
-        val_ls = 0.0
         for x, y in get_batches(data, batch_size, seq_len):
             optimizer.zero_grad()
             x = torch.tensor(x).float().to(device)
@@ -109,34 +112,16 @@ def train(model, data, batch_size, seq_len, epochs, lr=0.01, valid=None):
             optimizer.step()
             train_ls += loss.item()
 
-        if valid is not None:
-            model.eval()
-            hs = None
-            with torch.no_grad():
-                for x, y in get_batches(valid, batch_size, seq_len):
-                    x = torch.tensor(x).float().to(device)  # x为一组测试数据，包含batch_size * seq_len个字
-                    out, hs = model(x, hs)
-
-                    # out.shape输出为tensor[batch_size * seq_len, vocab_size]
-                    hs = ([h.data for h in hs])  # 更新参数
-
-                    y = y.reshape(-1, len(model.vocab))  # y.shape为(128,100,43)，因此需要转成两维，每行就代表一个字了，43为字典大小
-                    y = model.onehot_decode(y)  # y标签即为测试数据各个字的下一个字，进行one_hot解码，即变为字符
-                    # 但是此时y 是[[..],[..]]形式
-                    y = model.label_encode(y.squeeze())  # 因此需要去掉一维才能成功解码
-                    # 此时y为[12...]成为一维的数组，每个代表自己字典里对应字符的字典序
-                    y = torch.from_numpy(y).long().to(device)
-
-                    # 这里y和y.squeeze()出来的东西一样，可能这里没啥用，不太懂
-                    loss = criterion(out, y.squeeze())  # 计算损失值
-                    val_ls += loss.item()
-
-            val_loss.append(np.mean(val_ls))
         train_loss.append(np.mean(train_ls))
         print("epoch:{} train_loss:{}".format(epoch, train_ls))
+        with open(dir_name + "/log.txt", "a") as log:
+            log.write("epoch:{} train_loss:{}\n".format(epoch, train_ls))
+        if epoch % 10 == 0:
+            model_name = dir_name + "/lstm_model_" + str(epoch) + ".net"
+            with open(model_name, 'wb') as f:  # 训练完了保存模型
+                torch.save(model.state_dict(), f)
 
     plt.plot(train_loss, label="train_loss")
-    plt.plot(val_loss, label="val loss")
     plt.title("loop vs epoch")
     plt.legend()
     plt.show()
@@ -176,7 +161,7 @@ def predict(model, char, top_k=None, hidden_size=None):
     return char, hidden_size
 
 
-def sample(model, length, top_k=None, sentence="c"):
+def sample(model, length, top_k=None, sentence="三十三剑客图"):
     hidden_size = None
     new_sentence = [char for char in sentence]
     for i in range(length):
@@ -206,24 +191,23 @@ def main():
     num_layers = 2
     batch_size = 128
     seq_len = 100
-    epochs = 450
+    epochs = 500
     lr = 0.01
 
     with open("data/三十三剑客图.txt", "r", encoding='gbk') as f:
         text = f.read()
         text = text.replace(
             '本书来自www.cr173.com免费txt小说下载站\n更多更新免费电子书请关注www.cr173.com', '')
-        text = [word for word in text if is_uchar(word)]
+        # text = [word for word in text if is_uchar(word)]
     vocab = np.array(sorted(set(text)))  # 建立字典
 
-    val_len = int(np.floor(0.2 * len(text)))  # 划分训练测试集
-    trainset = np.array(list(text[:-val_len]))
-    validset = np.array(list(text[-val_len:]))
+    trainset = np.array(list(text))
 
     model = lstm_model(vocab, hidden_size, num_layers)  # 模型实例化
-    # train(model, trainset, batch_size, seq_len, epochs, lr=lr, valid=validset)  # 训练模型
+    train(model, trainset, batch_size, seq_len, epochs, lr=lr)  # 训练模型
     model.load_state_dict(torch.load("lstm_model.net"))  # 调用保存的模型
-    new_text = sample(model, 500, top_k=5,)  # 预测模型，生成100个字符,预测时选择概率最大的前5个
+    new_text = sample(model, 500, top_k=5,
+                      sentence="间")  # 预测模型，生成100个字符,预测时选择概率最大的前5个
     print(new_text)  # 输出预测文本
 
 

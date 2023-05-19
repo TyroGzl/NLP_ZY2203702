@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import OneHotEncoder
 import torch.nn.functional as F
+import os
 
 
 class lstm_model(nn.Module):
@@ -30,7 +31,6 @@ class lstm_model(nn.Module):
         out, hs = self.lstm(sequence, hs)  # lstm的输出格式（batch_size, sequence_length, hidden_size）
         out = out.reshape(-1, self.hidden_size)  # 这里需要将out转换为linear的输入格式，即（batch_size * sequence_length, hidden_size）
         output = self.linear(out)
-        # output = self.linear(out[:, -1])  # linear的输出格式，(batch_size * sequence_length, vocab_size)
         return output, hs
 
     def onehot_encode(self, data):
@@ -74,10 +74,18 @@ def get_batches(data, batch_size, seq_len):
         yield x, y  # 节省内存
 
 
-def train(model, data, batch_size, seq_len, epochs, lr=0.01, valid=None):
+def train(model, data, batch_size, seq_len, epochs, lr=0.01):
+    dir_name = os.path.basename(__file__).split(".")[0]
+    if not os.path.exists(dir_name):
+        os.mkdir(dir_name)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print("The device used is: {}".format(device))
-
+    print("Load model or not: \n1: Yes\n2: No\n")
+    flag = eval(input())
+    if flag == 1:
+        print("Input model name: ")
+        model_name = input()
+        model.load_state_dict(torch.load(model_name))
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss()
@@ -88,7 +96,7 @@ def train(model, data, batch_size, seq_len, epochs, lr=0.01, valid=None):
 
     for epoch in range(epochs):
         model.train()
-        hs = None  # hs等于hidden_size隐藏层节点
+        hs = None
         train_ls = 0.0
         for x, y in get_batches(data, batch_size, seq_len):
             optimizer.zero_grad()
@@ -106,6 +114,12 @@ def train(model, data, batch_size, seq_len, epochs, lr=0.01, valid=None):
 
         train_loss.append(np.mean(train_ls))
         print("epoch:{} train_loss:{}".format(epoch, train_ls))
+        with open(dir_name + "/log.txt", "a") as log:
+            log.write("epoch:{} train_loss:{}\n".format(epoch, train_ls))
+        if epoch % 10 == 0:
+            model_name = dir_name + "/lstm_model_" + str(epoch) + ".net"
+            with open(model_name, 'wb') as f:  # 训练完了保存模型
+                torch.save(model.state_dict(), f)
 
     plt.plot(train_loss, label="train_loss")
     plt.title("loop vs epoch")
@@ -177,7 +191,7 @@ def main():
     num_layers = 2
     batch_size = 128
     seq_len = 100
-    epochs = 2
+    epochs = 5000
     lr = 0.01
 
     with open("data/三十三剑客图.txt", "r", encoding='gbk') as f:
@@ -193,7 +207,7 @@ def main():
     train(model, trainset, batch_size, seq_len, epochs, lr=lr)  # 训练模型
     model.load_state_dict(torch.load("lstm_model.net"))  # 调用保存的模型
     new_text = sample(model, 500, top_k=5,
-                      sentence="唐朝开元年间")  # 预测模型，生成100个字符,预测时选择概率最大的前5个
+                      sentence="间")  # 预测模型，生成100个字符,预测时选择概率最大的前5个
     print(new_text)  # 输出预测文本
 
 
