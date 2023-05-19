@@ -171,7 +171,7 @@ def main():
     num_layers = 2
     batch_size = 128
     seq_len = 100
-    epochs = 5000
+    epochs = 1000
     lr = 0.01
 
     dir_name = os.path.basename(__file__).split(".")[0]
@@ -187,7 +187,7 @@ def main():
     trainset = np.array(list(text))
 
     model = lstm_model(vocab, hidden_size, num_layers)  # 模型实例化
-    # train(model, trainset, batch_size, seq_len, epochs, lr=lr)  # 训练模型
+    train(model, trainset, batch_size, seq_len, epochs, lr=lr)  # 训练模型
     model.load_state_dict(torch.load(dir_name + "/lstm_model_1300.net"))  # 调用保存的模型
     new_text = sample(model, 500, top_k=5,
                       sentence="唐朝开元年间")  # 预测模型，生成100个字符,预测时选择概率最大的前5个
