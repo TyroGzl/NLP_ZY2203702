@@ -171,7 +171,7 @@ def main():
     num_layers = 2
     batch_size = 128
     seq_len = 100
-    epochs = 5000
+    epochs = 1000
     lr = 0.01
 
     dir_name = os.path.basename(__file__).split(".")[0]
